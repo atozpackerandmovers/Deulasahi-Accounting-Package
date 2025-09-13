@@ -157,6 +157,445 @@
             }
             
             showLoginView() {
+                document.getElementById('loginSection').classList.remove('hidden');
+                document.getElementById('appSection').classList.add('hidden');
+            }
+            
+            showAppView() {
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('appSection').classList.remove('hidden');
+                wireTabs('#mainNav');
+                this.updateDashboard();
+            }
+            
+            async loadData() {
+                if (this.isOnline) {
+                    await this.loadFromFirebase();
+                } else {
+                    this.loadFromLocal();
+                }
+            }
+            
+            async loadFromFirebase() {
+                try {
+                    // Load accounts
+                    const accountsQuery = query(collection(db, 'accounts'), orderBy('createdAt', 'desc'));
+                    const accountsSnapshot = await getDocs(accountsQuery);
+                    this.accounts = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    
+                    // Load transactions
+                    const transactionsQuery = query(collection(db, 'transactions'), orderBy('createdAt', 'desc'));
+                    const transactionsSnapshot = await getDocs(transactionsQuery);
+                    this.transactions = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    
+                    // Save to local storage as backup
+                    localStorage.setItem('accounts', JSON.stringify(this.accounts));
+                    localStorage.setItem('transactions', JSON.stringify(this.transactions));
+                    
+                } catch (error) {
+                    console.error('Firebase load error:', error);
+                    throw error;
+                }
+            }
+            
+            loadFromLocal() {
+                try {
+                    this.accounts = JSON.parse(localStorage.getItem('accounts') || '[]');
+                    this.transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+                } catch (error) {
+                    console.error('Local storage load error:', error);
+                    this.accounts = [];
+                    this.transactions = [];
+                }
+            }
+            
+            updateDashboard() {
+                const totalCredit = this.transactions.filter(t => t.type === 'credit').reduce((sum, t) => sum + t.amount, 0);
+                const totalDebit = this.transactions.filter(t => t.type === 'debit').reduce((sum, t) => sum + t.amount, 0);
+                const netBalance = totalCredit - totalDebit;
+                
+                document.getElementById('totalCredit').textContent = `₹${totalCredit.toFixed(2)}`;
+                document.getElementById('totalDebit').textContent = `₹${totalDebit.toFixed(2)}`;
+                document.getElementById('totalAccounts').textContent = this.accounts.length;
+                
+                const netBalanceEl = document.getElementById('netBalance');
+                netBalanceEl.textContent = `₹${netBalance.toFixed(2)}`;
+                netBalanceEl.className = `text-lg sm:text-2xl font-bold ${netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                
+                this.updateRecentTransactions();
+            }
+            
+            updateRecentTransactions() {
+                const container = document.getElementById('recentTransactions');
+                if (!container) return;
+                
+                const recentTx = this.transactions.slice(0, 5);
+                
+                if (recentTx.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-8">No transactions yet. Add your first transaction!</p>';
+                    return;
+                }
+                
+                container.innerHTML = recentTx.map(tx => {
+                    const account = this.accounts.find(acc => acc.id === tx.accountId);
+                    return `
+                        <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg ${tx.type === 'credit' ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-red-500'}">
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-900">${account ? account.name : 'Account'}</p>
+                                <p class="text-sm text-gray-600">${tx.description || 'No description'}</p>
+                                <p class="text-xs text-gray-500">${new Date(tx.date).toLocaleDateString()}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-bold ${tx.type === 'credit' ? 'text-green-600' : 'text-red-600'}">
+                                    ${tx.type === 'credit' ? '+' : '-'}₹${tx.amount.toFixed(2)}
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            showLoading(show) {
+                const loader = document.getElementById('loadingIndicator');
+                if (loader) {
+                    loader.classList.toggle('hidden', !show);
+                }
+            }
+            
+            showToast(message, type = 'info') {
+                const toast = document.getElementById('toast');
+                const messageEl = document.getElementById('toastMessage');
+                
+                if (!toast || !messageEl) return;
+                
+                messageEl.textContent = message;
+                
+                // Set color based on type
+                toast.className = `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 ${
+                    type === 'success' ? 'bg-green-500 text-white' :
+                    type === 'error' ? 'bg-red-500 text-white' :
+                    type === 'warning' ? 'bg-yellow-500 text-white' :
+                    'bg-blue-500 text-white'
+                }`;
+                
+                toast.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 3000);
+            }
+        }
+        
+        // Tab Navigation System
+        function wireTabs() {
+          document.querySelectorAll("[data-tab-target]").forEach(btn => {
+            btn.addEventListener("click", () => {
+              showSection(btn.getAttribute("data-tab-target"));
+            });
+          });
+        }
+        
+        // Make functions globally available
+        window.wireTabs = wireTabs;
+        window.AppController = AppController;
+    </script>
+    
+    <script type="module">
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
+          from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc } 
+          from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const auth = getAuth();
+        const db   = getFirestore();
+
+        function showLogin() {
+          document.getElementById("loginSection")?.classList.remove("hidden");
+          document.getElementById("appSection")?.classList.add("hidden");
+          const btn = document.getElementById("loginBtn");
+          if (btn) { btn.disabled = false; btn.textContent = "Login"; }
+        }
+
+        function showApp() {
+          document.getElementById("loginSection")?.classList.add("hidden");
+          document.getElementById("appSection")?.classList.remove("hidden");
+          // If you have a tab system:
+          if (typeof window.showSection === "function") window.showSection("dashboard");
+        }
+
+        async function getUserRole(uid) {
+          // Firestore: users/{uid} -> { role: "admin" | "member" }
+          const snap = await getDoc(doc(db, "users", uid));
+          return snap.exists() ? (snap.data().role || "member") : "member";
+        }
+
+        // auto-switch UI when auth state changes (reloads, back/forward, after login)
+        onAuthStateChanged(auth, async (user) => {
+          if (!user) { showLogin(); return; }
+          // OPTIONAL: if your UI has a role toggle, you can gate here too,
+          // otherwise just show the app:
+          showApp();
+        });
+
+        // login handler
+        document.getElementById("loginBtn")?.addEventListener("click", async () => {
+          const btn   = document.getElementById("loginBtn");
+          const email = document.getElementById("loginEmail")?.value?.trim();
+          const pass  = document.getElementById("loginPassword")?.value ?? "";
+
+          try {
+            if (btn) { btn.disabled = true; btn.textContent = "Logging in..."; }
+
+            await signInWithEmailAndPassword(auth, email, pass);
+
+            // OPTIONAL: role check (uncomment if you use role gating on the form)
+            // const wantedRole = document.querySelector('[data-role].active')?.dataset.role;
+            // const actualRole = await getUserRole(auth.currentUser.uid);
+            // if (wantedRole && actualRole !== wantedRole) {
+            //   alert("You don't have access to this role.");
+            //   await signOut(auth);
+            //   showLogin();
+            //   return;
+            // }
+
+            // ✅ user is signed in: show the app
+            showApp();
+            // (You can remove the alert if you want)
+            // alert("Login successful!");
+          } catch (err) {
+            alert(err.message || "Login failed");
+            showLogin();
+          }
+        });
+
+        // --- Logout ---
+        document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+          await signOut(auth);
+          showLogin();
+        });
+    </script>
+    
+    <script>
+      function wireTabs() {
+        document.querySelectorAll("[data-tab-target]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            showSection(btn.getAttribute("data-tab-target"));
+          });
+        });
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        onAuthStateChanged(getAuth(), (user) => {
+          const loginCard = document.getElementById("loginSection");
+          const app = document.getElementById("appSection");
+          if (user) {
+            if (loginCard) loginCard.classList.add("hidden");
+            if (app) app.classList.remove("hidden");
+            if (typeof showSection === "function") showSection("dashboard");
+          } else {
+            if (app) app.classList.add("hidden");
+            if (loginCard) loginCard.classList.remove("hidden");
+          }
+        });
+        
+        wireTabs();
+        
+        // Initialize app controller
+        if (window.AppController) {
+          window.app = new window.AppController();
+        }
+        
+        // Setup role tab listeners
+        const memberTab = document.getElementById('memberTab');
+        const adminTab = document.getElementById('adminTab');
+        const roleInput = document.getElementById('currentRole');
+
+        memberTab?.addEventListener('click', () => {
+          if (roleInput) roleInput.value = 'member';
+          memberTab.className = 'px-3 py-2 rounded bg-blue-600 text-white cursor-pointer';
+          adminTab.className = 'px-3 py-2 rounded bg-gray-200 cursor-pointer';
+        });
+
+        adminTab?.addEventListener('click', () => {
+          if (roleInput) roleInput.value = 'admin';
+          adminTab.className = 'px-3 py-2 rounded bg-purple-600 text-white cursor-pointer';
+          memberTab.className = 'px-3 py-2 rounded bg-gray-200 cursor-pointer';
+        });
+      });
+    </script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            overflow-x: hidden;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .tab-link { 
+            padding: 8px 10px; 
+            display: inline-block; 
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        
+        .tab-link.active { 
+            border-bottom: 2px solid #2563eb; 
+            font-weight: 600;
+        }
+        
+        .hidden { display: none !important; }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pulse-loader {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @media (max-width: 640p        class AppController {
+            constructor() {
+                this.currentUser = null;
+                this.currentRole = 'member';
+                this.accounts = [];
+                this.transactions = [];
+                this.isOnline = navigator.onLine;
+                this.init();
+            }
+            
+            async init() {
+                this.setupNetworkListeners();
+                this.setupAuthListener();
+                this.setupEventListeners();
+                this.showLoginView();
+            }
+            
+            setupNetworkListeners() {
+                window.addEventListener('online', () => {
+                    this.isOnline = true;
+                    this.showToast('Back online! Syncing data...', 'success');
+                });
+                
+                window.addEventListener('offline', () => {
+                    this.isOnline = false;
+                    this.showToast('You are offline. Changes will be saved locally.', 'warning');
+                });
+            }
+            
+            setupAuthListener() {
+                onAuthStateChanged(auth, (user) => {
+                    this.currentUser = user;
+                    if (user) {
+                        this.handleSuccessfulLogin();
+                    } else {
+                        this.handleLogout();
+                    }
+                });
+            }
+            
+            setupEventListeners() {
+                // Login form
+                document.getElementById('loginForm')?.addEventListener('submit', (e) => this.handleLogin(e));
+                
+                // Logout button
+                document.getElementById('logoutBtn')?.addEventListener('click', () => this.logout());
+                
+                // Role switching
+                document.getElementById('memberTab')?.addEventListener('click', () => this.switchRole('member'));
+                document.getElementById('adminTab')?.addEventListener('click', () => this.switchRole('admin'));
+            }
+            
+            switchRole(role) {
+                const memberTab = document.getElementById('memberTab');
+                const adminTab = document.getElementById('adminTab');
+                const currentRoleInput = document.getElementById('currentRole');
+                
+                if (role === 'member') {
+                    memberTab.className = 'px-3 py-2 rounded bg-blue-600 text-white';
+                    adminTab.className = 'px-3 py-2 rounded bg-gray-200';
+                } else {
+                    memberTab.className = 'px-3 py-2 rounded bg-gray-200';
+                    adminTab.className = 'px-3 py-2 rounded bg-purple-600 text-white';
+                }
+                
+                this.currentRole = role;
+                if (currentRoleInput) {
+                    currentRoleInput.value = role;
+                }
+            }
+            
+            async handleLogin(e) {
+                e.preventDefault();
+                const form = e.target;
+                const email = form.querySelector('input[type="email"]').value.trim();
+                const password = form.querySelector('input[type="password"]').value;
+                
+                if (!email || !password) {
+                    this.showToast('Please enter email and password', 'error');
+                    return;
+                }
+                
+                try {
+                    this.showLoading(true);
+                    await signInWithEmailAndPassword(auth, email, password);
+                } catch (error) {
+                    this.showToast(error.message || 'Login failed', 'error');
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+            
+            async handleSuccessfulLogin() {
+                try {
+                    this.showLoading(true);
+                    await this.loadData();
+                    this.showAppView();
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    this.showToast('Error loading data. Working in offline mode.', 'warning');
+                    this.showAppView();
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+            
+            handleLogout() {
+                this.currentUser = null;
+                this.accounts = [];
+                this.transactions = [];
+                this.showLoginView();
+            }
+            
+            async logout() {
+                try {
+                    await signOut(auth);
+                    this.showToast('Logged out successfully', 'success');
+                } catch (error) {
+                    console.error('Logout error:', error);
+                }
+            }
+            
+            showLoginView() {
                 document.getElementById('loginView').classList.remove('hidden');
                 document.getElementById('appView').classList.add('hidden');
             }
@@ -2004,5 +2443,6 @@
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97e2709e51322e88',t:'MTc1NzcxMTkzMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 
 </html>
+
 
 
