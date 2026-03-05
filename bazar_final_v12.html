@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deulasahi Bazar Committee – Receipt Generator</title>
+
+  <!-- Required for JPG export -->
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+  <style>
+    :root{
+      --blue:#1d4ed8;
+      --blue2:#2563eb;
+      --bg:#f3f4f6;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --text:#111827;
+      --border:#e5e7eb;
+      --shadow: 0 12px 30px rgba(0,0,0,.10);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; padding:24px 14px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap{max-width:820px;margin:0 auto}
+    .hero{
+      background: linear-gradient(160deg, var(--blue), var(--blue2));
+      border-radius: 26px;
+      padding: 24px 18px 16px;
+      box-shadow: var(--shadow);
+      color:#fff;
+    }
+    .hero h1{
+      margin:0 0 12px;
+      font-size: 34px;
+      letter-spacing:.2px;
+      font-weight: 900;
+    }
+    .btnrow{display:flex; gap:12px; flex-wrap:wrap; margin-top:10px;}
+    button{
+      border:none;
+      padding:14px 16px;
+      border-radius:16px;
+      font-weight:900;
+      font-size:16px;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      min-width: 170px;
+      box-shadow: 0 8px 18px rgba(0,0,0,.18);
+      background:#e5e7eb;
+      color:#111827;
+    }
+    .smallnote{
+      margin-top:10px;
+      font-size:12px;
+      color:#e5e7eb;
+      opacity:.95;
+      line-height:1.4;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:14px;
+      margin-top:18px;
+    }
+    @media (min-width: 900px){
+      .grid{grid-template-columns: 1fr 1fr}
+    }
+    .card{
+      background: var(--card);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: 0 10px 20px rgba(0,0,0,.06);
+    }
+    .card h2{
+      margin:0 0 10px;
+      font-size: 16px;
+      color:#0f172a;
+    }
+    label{display:block; font-weight:900; font-size:14px; margin:10px 0 6px}
+    .hint{color:var(--muted); font-size:12px; margin-top:-4px}
+    input, select, textarea{
+      width:100%;
+      padding:14px 14px;
+      border-radius:14px;
+      border:2px solid #e5e7eb;
+      outline:none;
+      font-size:18px;
+      background:#f9fafb;
+    }
+    input:focus, select:focus, textarea:focus{border-color:#93c5fd; background:#fff}
+
+    /* Receipt (captured as JPG) */
+    .receipt{
+      background:#ffffff;
+      border: 2px solid #e5e7eb;
+      border-radius: 16px;
+      overflow:hidden;
+    }
+    .r-head{
+      padding:18px 16px 16px;
+      text-align:center;
+      background: linear-gradient(160deg, #1d4ed8, #2563eb);
+      color:#ffffff;
+    }
+    .r-head .t1{font-weight:1000;font-size:20px;letter-spacing:.3px}
+    .r-head .t2{margin-top:6px;color:#ffffff;font-weight:900}
+    .r-body{padding:14px 16px}
+    .row{display:flex; justify-content:space-between; gap:14px; padding:11px 0; border-bottom:1px solid #eef2ff}
+    .row:last-child{border-bottom:none}
+    .k{color:#475569; font-weight:900}
+    .v{font-weight:1000}
+    .r-terms{
+      padding:14px 16px 16px;
+      border-top:2px dashed #e5e7eb;
+      background:#f8fafc;
+      font-size:12.5px;
+      line-height:1.5;
+      color:#0f172a;
+    }
+    .r-terms h3{margin:0 0 8px; font-size:13.5px}
+    .r-terms ol{margin:0; padding-left:18px}
+    .warn{
+      margin-top:10px;
+      background:#fff7ed;
+      border:1px solid #fed7aa;
+      padding:10px 12px;
+      border-radius:14px;
+      font-size:12.5px;
+      color:#7c2d12;
+      line-height:1.4;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>Receipt Generator</h1>
+
+      <div class="btnrow">
+        <button id="btnDownload" type="button" onclick="downloadReceipt()">
+          <span>⬇</span> <span>Download JPG</span>
+        </button>
+
+        <button id="btnSubmit" type="button" onclick="submitWhatsApp()">
+          <span>✅</span> <span>Submit</span>
+        </button>
+      </div>
+
+      <div class="smallnote">
+        • <b>Download JPG</b> = only receipt JPG download (no WhatsApp).<br>
+        • <b>Submit</b> = only WhatsApp message open to customer + security copy (no image).<br>
+        Note: WhatsApp “auto-send” silently is not possible. WhatsApp opens with message — you tap <b>Send</b>.
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Input Details</h2>
+
+        <label for="receiptNo">RECEIPT NUMBER</label>
+        <div class="hint">Editable. After Download/Submit, next number auto-generates.</div>
+        <input id="receiptNo" type="text" placeholder="e.g., RCP-2026-001" />
+
+        <label for="txDate">DATE</label>
+        <div class="hint">Transaction date</div>
+        <input id="txDate" type="date" />
+
+        <label for="payerName">PAYER NAME</label>
+        <div class="hint">Full name</div>
+        <input id="payerName" type="text" placeholder="Shopkeeper name" />
+
+        <label for="waNumber">WHATSAPP NUMBER</label>
+        <div class="hint">Customer WhatsApp number (10 digits). Example: 9338888550</div>
+        <input id="waNumber" type="tel" inputmode="numeric" placeholder="9338888550" />
+
+        <label for="amount">AMOUNT (₹)</label>
+        <div class="hint">In rupees</div>
+        <input id="amount" type="number" inputmode="numeric" placeholder="500" />
+
+        <label for="note">NOTE (Optional)</label>
+        <div class="hint">Write any remark (UPI ref, month, due note, etc.)</div>
+        <textarea id="note" rows="3" placeholder="Write note here..."></textarea>
+
+        <label for="receivedBy">RECEIVED BY</label>
+        <div class="hint">Choose collector role</div>
+        <select id="receivedBy">
+          <option value="Committee President">Committee President</option>
+          <option value="Committee Secretary">Committee Secretary</option>
+          <option value="Committee Joint Secretary">Committee Joint Secretary</option>
+          <option value="Committee Member">Committee Member</option>
+        </select>
+
+        <div class="warn" id="warnBox" style="display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2><span style="background:#1d4ed8;color:white;padding:10px 14px;border-radius:10px;display:inline-block;">Receipt Preview (JPG Output)</span></h2>
+
+        <div id="receipt" class="receipt">
+          <div class="r-head">
+            <div class="t1">Deulasahi Bazar Committee</div>
+            <div class="t2">Money Receipt</div>
+          </div>
+
+          <div class="r-body">
+            <div class="row"><div class="k">Receipt No</div><div class="v" id="pReceiptNo">—</div></div>
+            <div class="row"><div class="k">Date</div><div class="v" id="pDate">—</div></div>
+            <div class="row"><div class="k">Payer Name</div><div class="v" id="pPayer">—</div></div>
+            <div class="row"><div class="k">WhatsApp</div><div class="v" id="pWa">—</div></div>
+            <div class="row"><div class="k">Amount</div><div class="v" id="pAmount">—</div></div>
+            <div class="row"><div class="k">Note</div><div class="v" id="pNote">—</div></div>
+            <div class="row"><div class="k">Received By</div><div class="v" id="pReceivedBy">—</div></div>
+          </div>
+
+          <div class="r-terms">
+            <h3>ନିୟମ ଓ ଶର୍ତ୍ତ (Terms & Conditions)</h3>
+            <ol>
+              <li>ଏହି ରସିଦ ଦେଉଳସାହି ବଜାର କମିଟିର ଅଧିକୃତ ଭାବେ ଜାରି କରାଯାଇଛି।</li>
+              <li>ଦିଆଯାଇଥିବା ରାଶି ବଜାର କମିଟିର ଅଧିକୃତ ତହବିଲ ଉଦ୍ଦେଶ୍ୟରେ ଗ୍ରହଣ କରାଯାଇଛି।</li>
+              <li>ଏହି ରସିଦ ବିନା କୌଣସି ଦାବି/ଅଭିଯୋଗ ଗ୍ରହଣ କରାଯିବ ନାହିଁ।</li>
+              <li>ଭବିଷ୍ୟତ ସନ୍ଦର୍ଭ ପାଇଁ ଏହି ରସିଦକୁ ସୁରକ୍ଷିତ ଭାବେ ସଂରକ୍ଷଣ କରନ୍ତୁ।</li>
+              <li><b>UPI ଅସ୍ଥାୟୀ ଖାତା ସୂଚନା:</b> ବର୍ତ୍ତମାନ UPI ମାଧ୍ୟମରେ ଗ୍ରହଣ କରାଯାଉଥିବା ରାଶି ଏକ ଅସ୍ଥାୟୀ/ବ୍ୟବସ୍ଥାଗତ ଖାତାରେ ଗ୍ରହଣ କରାଯାଉଛି। ଦେଉଳସାହି ବଜାର କମିଟିର ନିଜସ୍ୱ ଅଧିକୃତ ବ୍ୟାଙ୍କ ଖାତା ସ୍ଥାପିତ ହେଲେ, ଏହି ସମସ୍ତ ଗ୍ରହିତ ରାଶି ସେହି ଅଧିକୃତ ଖାତାକୁ ନିୟମାନୁସାରେ ସ୍ଥାନାନ୍ତର କରାଯିବ।</li>
+            </ol>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ======== IMPORTANT NOTE ========
+   JPG export needs html2canvas script to load.
+   If you open this file without internet, html2canvas will not load and JPG functions won't work.
+   In that case: upload this HTML to your website (https) OR ask me for OFFLINE version (embedded library).
+================================== */
+
+// ===== Config =====
+const SECURITY_WA_NUMBER = "919338888550"; // fixed security number (+91)
+const STORAGE_KEY = "bazar_receipt_last_no_v7";
+
+// ===== Helpers =====
+function pad(n, width){
+  const s = String(n);
+  return s.length >= width ? s : ("0".repeat(width - s.length) + s);
+}
+function formatDateDDMMYYYY(iso){
+  if(!iso) return "—";
+  const parts = iso.split("-");
+  if(parts.length !== 3) return "—";
+  const [y,m,d] = parts;
+  return `${d}/${m}/${y}`;
+}
+function safeText(v){
+  return (v && String(v).trim().length) ? String(v).trim() : "—";
+}
+function amountText(v){
+  const n = Number(v);
+  if(!isFinite(n) || n <= 0) return "—";
+  return "₹" + n.toLocaleString("en-IN");
+}
+function normalizeIndianNumber(raw){
+  if(!raw) return "";
+  let s = String(raw).trim();
+  s = s.replace(/[^0-9]/g,"");
+  if(s.length === 10) return "91" + s;
+  if(s.length === 12 && s.startsWith("91")) return s;
+  if(s.length === 11 && s.startsWith("0")) return "91" + s.slice(1);
+  return s;
+}
+function parseAndIncrementReceipt(receiptNo){
+  const m = /^([A-Za-z]+-\d{4}-)(\d+)$/.exec(receiptNo.trim());
+  if(!m) return null;
+  const prefix = m[1];
+  const numStr = m[2];
+  const next = parseInt(numStr, 10) + 1;
+  const nextStr = pad(next, numStr.length);
+  return prefix + nextStr;
+}
+function showWarn(msg){
+  const box = document.getElementById("warnBox");
+  if(!box) return;
+  box.style.display = "block";
+  box.textContent = msg;
+}
+
+// ===== Messages =====
+function buildCustomerMessage(){
+  const r = safeText(document.getElementById("receiptNo").value);
+  const dt = formatDateDDMMYYYY(document.getElementById("txDate").value);
+  const name = safeText(document.getElementById("payerName").value);
+  const amt = amountText(document.getElementById("amount").value);
+  const rb = safeText(document.getElementById("receivedBy").value);
+  const note = safeText(document.getElementById("note").value);
+
+  return [
+    "Deulasahi Bazar Committee",
+    "Money Receipt",
+    "",
+    "Receipt No: " + r,
+    "Date: " + dt,
+    "Name: " + name,
+    "Amount: " + amt,
+    "Received By: " + rb,
+    (note !== "—" ? ("Note: " + note) : ""),
+    "",
+    "Please attach/download the receipt JPG and keep it for your record. 🙏"
+  ].filter(Boolean).join("\n");
+}
+
+function buildSecurityMessage(){
+  const r = safeText(document.getElementById("receiptNo").value);
+  const dt = formatDateDDMMYYYY(document.getElementById("txDate").value);
+  const name = safeText(document.getElementById("payerName").value);
+  const amt = amountText(document.getElementById("amount").value);
+  const rb = safeText(document.getElementById("receivedBy").value);
+  const note = safeText(document.getElementById("note").value);
+
+  return [
+    "Deulasahi Bazar Committee Receipt",
+    "",
+    "Receipt No: " + r,
+    "Date: " + dt,
+    "Payer Name: " + name,
+    "Amount: " + amt,
+    "Note: " + note,
+    "Received By: " + rb,
+    "",
+    "Security Copy (Auto)"
+  ].join("\n");
+}
+
+function openWhatsAppTo(numberE164Digits, text){
+  const url = "https://wa.me/" + numberE164Digits + "?text=" + encodeURIComponent(text);
+  window.open(url, "_blank");
+}
+
+// ===== Preview =====
+function setPreview(){
+  document.getElementById("pReceiptNo").textContent = safeText(document.getElementById("receiptNo").value);
+  document.getElementById("pDate").textContent      = formatDateDDMMYYYY(document.getElementById("txDate").value);
+  document.getElementById("pPayer").textContent     = safeText(document.getElementById("payerName").value);
+  document.getElementById("pWa").textContent        = safeText(document.getElementById("waNumber").value);
+  document.getElementById("pAmount").textContent    = amountText(document.getElementById("amount").value);
+  document.getElementById("pNote").textContent      = safeText(document.getElementById("note").value);
+  document.getElementById("pReceivedBy").textContent= safeText(document.getElementById("receivedBy").value);
+}
+
+// ===== Validation =====
+function validateBeforeAction(){
+  const r = document.getElementById("receiptNo").value.trim();
+  const name = document.getElementById("payerName").value.trim();
+  const waRaw = document.getElementById("waNumber").value.trim();
+  const wa = normalizeIndianNumber(waRaw);
+  const amt = Number(document.getElementById("amount").value);
+
+  if(!r){ alert("Please enter Receipt Number."); return false; }
+  if(!name){ alert("Please enter Payer Name."); return false; }
+  if(!waRaw){ alert("Please enter WhatsApp Number."); return false; }
+  if(!wa || wa.length < 10){ alert("Please enter valid WhatsApp Number."); return false; }
+  if(!isFinite(amt) || amt <= 0){ alert("Please enter valid Amount."); return false; }
+
+
+function validateDownload(){
+  const r = document.getElementById("receiptNo").value.trim();
+  const name = document.getElementById("payerName").value.trim();
+  const amt = Number(document.getElementById("amount").value);
+  if(!r){ alert("Please enter Receipt Number."); return false; }
+  if(!name){ alert("Please enter Payer Name."); return false; }
+  if(!isFinite(amt) || amt <= 0){ alert("Please enter valid Amount."); return false; }
+  return true;
+}
+
+  return true;
+}
+
+// ===== JPG generation =====
+
+
+async function generateJpgBlob(){
+  if(typeof html2canvas === "undefined"){
+    showWarn("html2canvas did not load. Please turn ON internet OR host this file on your website (https). For OFFLINE version, ask me.");
+    alert("JPG function needs internet (html2canvas). Please turn ON internet or host on website. Ask me for OFFLINE version.");
+    return null;
+  }
+
+  // SCREENSHOT-LIKE MODE:
+  // Capture only what is currently visible on screen (viewport), exactly like your screenshot.
+  const scale = Math.max(2, window.devicePixelRatio || 2);
+
+  // Render the whole body once, then crop to viewport
+  const fullCanvas = await html2canvas(document.body, {
+    scale: scale,
+    backgroundColor: "#ffffff",
+    useCORS: true,
+    allowTaint: true,
+    logging: false,
+    scrollX: 0,
+    scrollY: -window.scrollY,
+    windowWidth: document.documentElement.scrollWidth,
+    windowHeight: document.documentElement.scrollHeight
+  });
+
+  const vw = Math.floor(window.innerWidth * scale);
+  const vh = Math.floor(window.innerHeight * scale);
+
+  // Crop from the rendered canvas to exactly viewport size
+  const cropCanvas = document.createElement("canvas");
+  cropCanvas.width = vw;
+  cropCanvas.height = vh;
+
+  const ctx = cropCanvas.getContext("2d");
+  // Source area starts at (0,0) because we set scrollY to -window.scrollY above (viewport aligned)
+  ctx.drawImage(fullCanvas, 0, 0, vw, vh, 0, 0, vw, vh);
+
+  return new Promise((resolve) => cropCanvas.toBlob(resolve, "image/jpeg", 0.95));
+}
+
+
+
+function persistReceiptNo(v){
+  try{ localStorage.setItem(STORAGE_KEY, v); }catch(e){}
+}
+
+function autoNextReceipt(){
+  const cur = document.getElementById("receiptNo").value.trim();
+  const next = parseAndIncrementReceipt(cur);
+  if(next){
+    document.getElementById("receiptNo").value = next;
+    persistReceiptNo(next);
+    setPreview();
+  }
+}
+
+// ===== Actions =====
+
+async function downloadReceipt(){
+  // STRICT: Only download JPG (no WhatsApp actions, no auto-next)
+  if(!validateDownload()) return;
+  setPreview();
+
+  const blob = await generateJpgBlob();
+  if(!blob) return;
+
+  const fileName = (document.getElementById("receiptNo").value.trim() || "receipt") + ".jpg";
+
+  // Detect common in-app browsers that often block direct downloads
+  const ua = navigator.userAgent || "";
+  const isInApp = /WhatsApp|FBAN|FBAV|Instagram|Line|Telegram/i.test(ua);
+
+  // 1) Primary: Blob URL + <a download>
+  const url = URL.createObjectURL(blob);
+  try{
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.rel = "noopener";
+    // Some webviews require the element to be visible in DOM
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }catch(e){
+    // ignore and try fallback below
+  }
+
+  // 2) Fallback: Data URL download (sometimes works when blob URL is blocked)
+  try{
+    const reader = new FileReader();
+    reader.onloadend = function(){
+      try{
+        const a2 = document.createElement("a");
+        a2.href = reader.result;
+        a2.download = fileName;
+        a2.rel = "noopener";
+        document.body.appendChild(a2);
+        a2.click();
+        a2.remove();
+      }catch(e){}
+    };
+    reader.readAsDataURL(blob);
+  }catch(e){}
+
+  // 3) In-app browser helper: open the image in a new tab for manual save if download is blocked
+  // (UI unchanged; this only helps when the webview blocks downloads)
+  if(isInApp){
+    // Small delay so the first download attempt happens first
+    setTimeout(()=>{
+      try{
+        window.open(url, "_blank", "noopener");
+      }catch(e){}
+      alert("If JPG did not download: open this page in Chrome OR in the new tab, long-press the image and choose 'Download image / Save image'.");
+    }, 350);
+  }
+
+  // Clean up blob URL later
+  setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(e){} }, 15000);
+}
+
+
+function submitWhatsApp(){
+  if(!validateBeforeAction()) return;
+  setPreview();
+
+  // Only WhatsApp message (no image download)
+  const customer = normalizeIndianNumber(document.getElementById("waNumber").value);
+  openWhatsAppTo(customer, buildCustomerMessage());
+
+  // Security copy
+  openWhatsAppTo(SECURITY_WA_NUMBER, buildSecurityMessage());
+
+  autoNextReceipt();
+}
+
+// ===== Init =====
+function init(){
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth()+1).padStart(2,"0");
+  const dd = String(today.getDate()).padStart(2,"0");
+  document.getElementById("txDate").value = `${yyyy}-${mm}-${dd}`;
+
+  const prefix = "RCP-" + yyyy + "-";
+  let saved = "";
+  try{ saved = localStorage.getItem(STORAGE_KEY) || ""; }catch(e){}
+  if(saved && saved.trim()){
+    document.getElementById("receiptNo").value = saved.trim();
+  }else{
+    document.getElementById("receiptNo").value = prefix + "001";
+    persistReceiptNo(document.getElementById("receiptNo").value.trim());
+  }
+
+  ["receiptNo","txDate","payerName","waNumber","amount","note","receivedBy"].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener("input", ()=>{ setPreview(); persistReceiptNo(document.getElementById("receiptNo").value.trim()); });
+    el.addEventListener("change", ()=>{ setPreview(); persistReceiptNo(document.getElementById("receiptNo").value.trim()); });
+  });
+
+  setPreview();
+}
+
+init();
+</script>
+
+</body>
+</html>
